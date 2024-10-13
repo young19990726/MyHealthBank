@@ -29,48 +29,56 @@ system_logger = logging.getLogger('custom.error')
 ## [POST] : 
 @router.post("", response_model=R1Base, name="Post r1", description="Post r1", include_in_schema=True)
 async def post_r1(
-    db: Session = Depends(get_conn)  
-):
+    db: Session = Depends(get_conn)
+    ):
+
     try:
         dtlfa_data = db.query(DTLFAR1).filter(DTLFAR1.is_analyzed == False).all()
-        ordfa_data = db.query(ORDFAR1).filter(ORDFAR1.is_analyzed == False).all()
 
-        merged_data = []
+        if dtlfa_data:
+            ordfa_data = db.query(ORDFAR1).filter(ORDFAR1.is_analyzed == False).all()
 
-        for dtlfa in dtlfa_data:
-            for ordfa in ordfa_data:
-                if dtlfa.dtlid == ordfa.fk_dtlid:  
-                    merged_row = R1(
-                        hos=dtlfa.hos,
-                        dtlid=dtlfa.dtlid,
-                        cno=dtlfa.cno,
-                        treatment_date=dtlfa.treatment_date,
-                        cm_code=dtlfa.cm_code,
-                        pcs_code=dtlfa.pcs_code,  
-                        order_code=ordfa.order_code,
-                        total_number=ordfa.total_number,
-                        dose_day=ordfa.dose_day,
-                    )
-                    merged_data.append(merged_row)
+            if ordfa_data:
+                dtlfa_index = {d.dtlid: d for d in dtlfa_data}
+
+                merged_data = []
+
+                for ordfa in ordfa_data:
+                    dtlfa = dtlfa_index.get(ordfa.fk_dtlid)
+
+                    if dtlfa:  
+                        merged_row = R1(
+                            hos=dtlfa.hos,
+                            dtlid=dtlfa.dtlid,
+                            cno=dtlfa.cno,
+                            treatment_date=dtlfa.treatment_date,
+                            cm_code=dtlfa.cm_code,
+                            pcs_code=dtlfa.pcs_code,  
+                            order_code=ordfa.order_code,
+                            total_number=ordfa.total_number,
+                            dose_day=ordfa.dose_day,
+                        )
+                        merged_data.append(merged_row)
+
+                    ordfa.is_analyzed = True
+                    if dtlfa:
+                        dtlfa.is_analyzed = True
 
         if merged_data:
-            db.add_all(merged_data)  # 只有在有合併資料時才執行
-            for dtlfa in dtlfa_data:
-                dtlfa.is_analyzed = True
-            for ordfa in ordfa_data:
-                ordfa.is_analyzed = True
-            db.commit()  # 單一提交
+            db.add_all(merged_data) 
+            db.commit()  
 
-        return {"detail": "Data merged and stored successfully."}  # 返回成功訊息
+        return {"detail": "Data merged and stored successfully."}  
 
     except IntegrityError as e:
         system_logger.error(exception_message(e))  
         raise HTTPException(status_code=400, detail="Integrity error with the provided data") 
 
     except Exception as e:
-        db.rollback()  # 異常時回滾
+        db.rollback()  
         system_logger.error(exception_message(e)) 
         raise HTTPException(status_code=500, detail="Error post r1") 
+  
 
 ## [GET]：
 @router.get("", response_model=List[R1Base], name="Get r1", description="Get r1", include_in_schema=True)

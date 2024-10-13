@@ -43,7 +43,7 @@ class DTLFAR1(Base):
     is_analyzed = Column(Boolean, default=False)
     create_time = Column(DateTime, default=func.now())
 
-    r1_ordfa = relationship("ORDFAR1", back_populates="r1_dtlfa")
+    # r1_ordfa = relationship("ORDFAR1", back_populates="r1_dtlfa")
 
 
 class ORDFAR1(Base):
@@ -51,14 +51,15 @@ class ORDFAR1(Base):
 
     uid = Column(Integer, primary_key=True, autoincrement=True)
     hos = Column(String(10), index=True)
-    fk_dtlid = Column(String(40), ForeignKey("r1_dtlfa.dtlid"), index=True) 
+    # fk_dtlid = Column(String(40), ForeignKey("r1_dtlfa.dtlid"), index=True) 
+    fk_dtlid = Column(String(40), index=True) 
     order_code = Column(String(20), index=True)
     total_number = Column(String(20), index=True)
     dose_day = Column(String(20), index=True)
     is_analyzed = Column(Boolean, default=False)
     create_time = Column(DateTime, default=func.now())
 
-    r1_dtlfa = relationship("DTLFAR1", back_populates="r1_ordfa")
+    # r1_dtlfa = relationship("DTLFAR1", back_populates="r1_ordfa")
 
 class R1(Base):
     __tablename__ = "r1"

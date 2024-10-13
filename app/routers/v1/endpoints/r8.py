@@ -29,42 +29,89 @@ system_logger = logging.getLogger('custom.error')
 ## [POST] : 
 @router.post("", response_model=R8Base, name="Post r8", description="Post r8", include_in_schema=True)
 async def post_r8(
-    db: Session = Depends(get_conn)  
-):
+    db: Session = Depends(get_conn)
+    ):
+
     try:
         order_code_master_data = db.query(OrderCodeMasterR1).all()
+
+        order_code_dict = {o.hos_ordercode: o.order_code for o in order_code_master_data}
+
         fxyreport_data = db.query(FxyreportR8).filter(FxyreportR8.is_analyzed == False).all()
 
-        merged_data = []
+        if fxyreport_data:
 
-        for fxyreport in fxyreport_data:
-            for order_code_master in order_code_master_data:
-                if fxyreport.fk_hos_ordercode == order_code_master.hos_ordercode:  
+            merged_data = []
+
+            for fxyreport in fxyreport_data:
+                
+                order_code = order_code_dict.get(fxyreport.fk_hos_ordercode)
+
+                if order_code: 
                     merged_row = R8(
                         hos=fxyreport.hos,
                         cno=fxyreport.cno,
                         performed_start_date=fxyreport.performed_start_date,
-                        order_code=order_code_master.order_code,
+                        order_code=order_code,
                         report_text=fxyreport.report_text
                     )
                     merged_data.append(merged_row)
 
-        if merged_data:
-            db.add_all(merged_data)  # 只有在有合併資料時才執行
-            for fxyreport in fxyreport_data:
-                fxyreport.is_analyzed = True
-            db.commit()  # 單一提交
+                    fxyreport.is_analyzed = True
 
-        return {"detail": "Data merged and stored successfully."}  # 返回成功訊息
+        if merged_data:
+            db.add_all(merged_data)               
+            db.commit()  
+
+        return {"detail": "Data merged and stored successfully."}
 
     except IntegrityError as e:
-        system_logger.error(exception_message(e))  
-        raise HTTPException(status_code=400, detail="Integrity error with the provided data") 
+        system_logger.error(exception_message(e))
+        raise HTTPException(status_code=400, detail="Integrity error with the provided data")
 
     except Exception as e:
-        db.rollback()  # 異常時回滾
-        system_logger.error(exception_message(e)) 
-        raise HTTPException(status_code=500, detail="Error post r8") 
+        db.rollback()  
+        system_logger.error(exception_message(e))
+        raise HTTPException(status_code=500, detail="Error post r8")
+
+# @router.post("", response_model=R8Base, name="Post r8", description="Post r8", include_in_schema=True)
+# async def post_r8(
+#     db: Session = Depends(get_conn)  
+# ):
+#     try:
+#         order_code_master_data = db.query(OrderCodeMasterR1).all()
+#         fxyreport_data = db.query(FxyreportR8).filter(FxyreportR8.is_analyzed == False).all()
+
+#         merged_data = []
+
+#         for fxyreport in fxyreport_data:
+#             for order_code_master in order_code_master_data:
+#                 if fxyreport.fk_hos_ordercode == order_code_master.hos_ordercode:  
+#                     merged_row = R8(
+#                         hos=fxyreport.hos,
+#                         cno=fxyreport.cno,
+#                         performed_start_date=fxyreport.performed_start_date,
+#                         order_code=order_code_master.order_code,
+#                         report_text=fxyreport.report_text
+#                     )
+#                     merged_data.append(merged_row)
+
+#         if merged_data:
+#             db.add_all(merged_data)  # 只有在有合併資料時才執行
+#             for fxyreport in fxyreport_data:
+#                 fxyreport.is_analyzed = True
+#             db.commit()  # 單一提交
+
+#         return {"detail": "Data merged and stored successfully."}  # 返回成功訊息
+
+#     except IntegrityError as e:
+#         system_logger.error(exception_message(e))  
+#         raise HTTPException(status_code=400, detail="Integrity error with the provided data") 
+
+#     except Exception as e:
+#         db.rollback()  # 異常時回滾
+#         system_logger.error(exception_message(e)) 
+#         raise HTTPException(status_code=500, detail="Error post r8") 
 
 ## [GET]：
 @router.get("", response_model=List[R8Base], name="Get r8", description="Get r8", include_in_schema=True)

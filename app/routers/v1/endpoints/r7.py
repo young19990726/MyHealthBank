@@ -27,255 +27,74 @@ system_logger = logging.getLogger('custom.error')
 
 ##### 連接資料庫並處理請求 #####
 ## [POST] : 
-# @router.post("", response_model=R7Base, name="Post r7", description="Post r7", include_in_schema=True)
-# async def post_r7(
-#     db: Session = Depends(get_conn)
-# ):
-#     try:
-#         fexreport_data = db.query(FexreportR7).filter(FexreportR7.is_analyzed == False).all()
-#         merged_data = []
-
-#         for fexreport in fexreport_data:
-
-#             if fexreport.order_code == 'None':
-#                 accession_number = fexreport.fk_accession_number
-
-#                 # 用來存放該 accession_number 找到的所有 order_code
-#                 order_codes = []
-
-#                 # 查詢所有與該 accession_number 關聯的 CureRecR1 資料
-#                 cure_rec_data = db.query(CureRecR1).filter(CureRecR1.accession_number == accession_number).all()
-
-#                 for cure_rec in cure_rec_data:
-#                     fk_hos_ordercode = cure_rec.fk_hos_ordercode
-#                     # 查詢 OrderCodeMasterR1 資料
-#                     order_code_master_data = db.query(OrderCodeMasterR1).filter(OrderCodeMasterR1.hos_ordercode == fk_hos_ordercode).first()
-
-#                     if order_code_master_data and order_code_master_data.order_code not in order_codes:
-#                         # 如果找到了對應的 order_code，將其加入列表
-#                         order_codes.append(order_code_master_data.order_code)
-#                 print(order_codes)
-#                 # 如果有找到 order_code，將其轉換為逗號分隔的字串
-#                 if order_codes:
-#                     fexreport.order_code = ",".join(order_codes)
-#                 else:
-#                     system_logger.warning(f"No order_code found for accession_number: {accession_number}")
-#                     continue  # 如果沒有找到任何 order_code，跳過當前循環
-
-#             # 將處理後的資料轉換為 R7 model
-#             model = R7(
-#                 hos=fexreport.hos,
-#                 cno=fexreport.cno,
-#                 report_date=fexreport.report_date,
-#                 fk_accession_number=fexreport.fk_accession_number,
-#                 ordclnm_name=fexreport.ordclnm_name,
-#                 data=fexreport.data,
-#                 order_code=fexreport.order_code,
-#             )
-#             merged_data.append(model)
-#         print(merged_data)
-#         if merged_data:
-#             db.add_all(merged_data)
-#             db.commit()
-
-#             # 標記所有 fexreport 為已分析
-#             for fexreport in fexreport_data:
-#                 fexreport.is_analyzed = True
-#             db.commit()
-
-#         return {"detail": "Data merged and stored successfully."}
-
-#     except IntegrityError as e:
-#         system_logger.error(exception_message(e))
-#         raise HTTPException(status_code=400, detail="Integrity error with the provided data")
-
-#     except Exception as e:
-#         db.rollback()
-#         system_logger.error(exception_message(e))
-#         raise HTTPException(status_code=500, detail="Error post r7")
 @router.post("", response_model=R7Base, name="Post r7", description="Post r7", include_in_schema=True)
 async def post_r7(
     db: Session = Depends(get_conn)
-):
+    ):
+
     try:
         fexreport_data = db.query(FexreportR7).filter(FexreportR7.is_analyzed == False).all()
-        merged_data = []
 
-        for fexreport in fexreport_data:
+        if fexreport_data:
+            accession_numbers = [f.fk_accession_number for f in fexreport_data]
+            cure_rec_data = db.query(CureRecR1).filter(CureRecR1.accession_number.in_(accession_numbers)).all()
 
-            accession_number = fexreport.fk_accession_number
+            if cure_rec_data:
+                cure_rec_dict = {c.accession_number: [] for c in cure_rec_data}
+                
+                for c in cure_rec_data:
+                    cure_rec_dict[c.accession_number].append(c)
 
-                # 用來存放該 accession_number 找到的所有 order_code
-            order_codes = []
+                hos_ordercodes = [c.fk_hos_ordercode for c in cure_rec_data]
 
-                # 查詢所有與該 accession_number 關聯的 CureRecR1 資料
-            cure_rec_data = db.query(CureRecR1).filter(CureRecR1.accession_number == accession_number).all()
+                order_code_master_data = db.query(OrderCodeMasterR1).filter(OrderCodeMasterR1.hos_ordercode.in_(hos_ordercodes)).all()
 
-            for cure_rec in cure_rec_data:
-                fk_hos_ordercode = cure_rec.fk_hos_ordercode
-                    # 查詢 OrderCodeMasterR1 資料
-                order_code_master_data = db.query(OrderCodeMasterR1).filter(OrderCodeMasterR1.hos_ordercode == fk_hos_ordercode).first()
+                if order_code_master_data:
+                    order_code_dict = {o.hos_ordercode: o.order_code for o in order_code_master_data}
 
-                if order_code_master_data and order_code_master_data.order_code not in order_codes:
-                        # 如果找到了對應的 order_code，將其加入列表
-                    order_codes.append(order_code_master_data.order_code)
+                    merged_data = []
 
-                # 如果有找到 order_code，將其轉換為逗號分隔的字串
-            
-            fexreport_order_code = ",".join(order_codes)
+                    for fexreport in fexreport_data:
 
-                    # 將處理後的資料轉換為 R7 model
-            model = R7(
-                hos=fexreport.hos,
-                cno=fexreport.cno,
-                report_date=fexreport.report_date,
-                fk_accession_number=fexreport.fk_accession_number,
-                ordclnm_name=fexreport.ordclnm_name,
-                data=fexreport.data,
-                order_code=fexreport_order_code,  # 使用新的 order_code
-            )
-            merged_data.append(model)
+                        order_codes = []  # 用來存放該 accession_number 找到的所有 order_code
 
-            # else:
-            #     system_logger.warning(f"No order_code found for accession_number: {accession_number}")
-            #     continue  # 如果沒有找到任何 order_code，跳過當前循環
-            
-            # 判斷 fexreport.order_code 是否為 'None'
-            # if fexreport.order_code == 'None':
-            # if fexreport.order_code is not None:
-            #     accession_number = fexreport.fk_accession_number
+                        if fexreport.fk_accession_number in cure_rec_dict:
+                            for cure_rec in cure_rec_dict[fexreport.fk_accession_number]:
+                                order_code = order_code_dict.get(cure_rec.fk_hos_ordercode)
+                                if order_code and order_code not in order_codes:
+                                    order_codes.append(order_code)
 
-            #     # 用來存放該 accession_number 找到的所有 order_code
-            #     order_codes = []
+                        if order_codes:
+                            fexreport_order_code = ",".join(order_codes)
 
-            #     # 查詢所有與該 accession_number 關聯的 CureRecR1 資料
-            #     cure_rec_data = db.query(CureRecR1).filter(CureRecR1.accession_number == accession_number).all()
+                            model = R7(
+                                hos=fexreport.hos,
+                                cno=fexreport.cno,
+                                report_date=fexreport.report_date,
+                                fk_accession_number=fexreport.fk_accession_number,
+                                ordclnm_name=fexreport.ordclnm_name,
+                                data=fexreport.data,
+                                order_code=fexreport_order_code,  
+                            )
+                            merged_data.append(model)
 
-            #     for cure_rec in cure_rec_data:
-            #         fk_hos_ordercode = cure_rec.fk_hos_ordercode
-            #         # 查詢 OrderCodeMasterR1 資料
-            #         order_code_master_data = db.query(OrderCodeMasterR1).filter(OrderCodeMasterR1.hos_ordercode == fk_hos_ordercode).first()
+                            fexreport.is_analyzed = True
 
-            #         if order_code_master_data and order_code_master_data.order_code not in order_codes:
-            #             # 如果找到了對應的 order_code，將其加入列表
-            #             order_codes.append(order_code_master_data.order_code)
+                    if merged_data:
+                        db.add_all(merged_data)
+                        db.commit() 
 
-            #     # 如果有找到 order_code，將其轉換為逗號分隔的字串
-            #     if order_codes:
-            #         fexreport_order_code = ",".join(order_codes)
-
-            #         # 將處理後的資料轉換為 R7 model
-            #         model = R7(
-            #             hos=fexreport.hos,
-            #             cno=fexreport.cno,
-            #             report_date=fexreport.report_date,
-            #             fk_accession_number=fexreport.fk_accession_number,
-            #             ordclnm_name=fexreport.ordclnm_name,
-            #             data=fexreport.data,
-            #             order_code=fexreport_order_code,  # 使用新的 order_code
-            #         )
-            #         merged_data.append(model)
-
-            #     else:
-            #         system_logger.warning(f"No order_code found for accession_number: {accession_number}")
-            #         continue  # 如果沒有找到任何 order_code，跳過當前循環
-
-            # else:
-            #     # fexreport.order_code 不是 'None'，直接使用原始的 order_code
-            #     model = R7(
-            #         hos=fexreport.hos,
-            #         cno=fexreport.cno,
-            #         report_date=fexreport.report_date,
-            #         fk_accession_number=fexreport.fk_accession_number,
-            #         ordclnm_name=fexreport.ordclnm_name,
-            #         data=fexreport.data,
-            #         order_code=fexreport.order_code,  # 使用原始的 order_code
-            #     )
-            #     merged_data.append(model)
-
-        if merged_data:
-            db.add_all(merged_data)  
-            for fexreport in fexreport_data:
-                fexreport.is_analyzed = True  # 更新分析狀態
-            db.commit() 
-
-        return {"detail": "Data merged and stored successfully."}  
+        return {"detail": "Data merged and stored successfully."}
 
     except IntegrityError as e:
-        system_logger.error(exception_message(e))  
-        raise HTTPException(status_code=400, detail="Integrity error with the provided data") 
+        system_logger.error(exception_message(e))
+        raise HTTPException(status_code=400, detail="Integrity error with the provided data")
 
     except Exception as e:
-        db.rollback()  
-        system_logger.error(exception_message(e)) 
+        db.rollback()
+        system_logger.error(exception_message(e))
         raise HTTPException(status_code=500, detail="Error post r7")
 
-# @router.post("", response_model=R7Base, name="Post r7", description="Post r7", include_in_schema=True)
-# async def post_r7(
-#     db: Session = Depends(get_conn)
-# ):
-#     try:
-#         fexreport_data = db.query(FexreportR7).filter(FexreportR7.is_analyzed == False).all()
-#         merged_data = []
-
-#         for fexreport in fexreport_data:
-
-#             if fexreport.order_code == 'None':
-#                 accession_number = fexreport.fk_accession_number
-
-#                 # 用來存放該 accession_number 找到的所有 order_code
-#                 order_codes = []
-
-#                 # 查詢所有與該 accession_number 關聯的 CureRecR1 資料
-#                 cure_rec_data = db.query(CureRecR1).filter(CureRecR1.accession_number == accession_number).all()
-
-#                 for cure_rec in cure_rec_data:
-#                     fk_hos_ordercode = cure_rec.fk_hos_ordercode
-#                     # 查詢 OrderCodeMasterR1 資料
-#                     order_code_master_data = db.query(OrderCodeMasterR1).filter(OrderCodeMasterR1.hos_ordercode == fk_hos_ordercode).first()
-
-#                     if order_code_master_data and order_code_master_data.order_code not in order_codes:
-#                         # 如果找到了對應的 order_code，將其加入列表
-#                         order_codes.append(order_code_master_data.order_code)
-#                 print(order_codes)
-#                 # 如果有找到 order_code，將其轉換為逗號分隔的字串
-#                 if order_codes:
-#                     fexreport_order_code = ",".join(order_codes)
-
-#                     # 將處理後的資料轉換為 R7 model
-#                     model = R7(
-#                         hos=fexreport.hos,
-#                         cno=fexreport.cno,
-#                         report_date=fexreport.report_date,
-#                         fk_accession_number=fexreport.fk_accession_number,
-#                         ordclnm_name=fexreport.ordclnm_name,
-#                         data=fexreport.data,
-#                         order_code=fexreport_order_code,
-#                     )
-#                     merged_data.append(model)
-
-#                 else:
-#                     system_logger.warning(f"No order_code found for accession_number: {accession_number}")
-#                     continue  # 如果沒有找到任何 order_code，跳過當前循環
-
-
-
-#         if merged_data:
-#             db.add_all(merged_data)  
-#             for fexreport in fexreport_data:
-#                 fexreport.is_analyzed = True
-#             db.commit() 
-
-#         return {"detail": "Data merged and stored successfully."}  
-
-#     except IntegrityError as e:
-#         system_logger.error(exception_message(e))  
-#         raise HTTPException(status_code=400, detail="Integrity error with the provided data") 
-
-#     except Exception as e:
-#         db.rollback()  
-#         system_logger.error(exception_message(e)) 
-#         raise HTTPException(status_code=500, detail="Error post r7")
 
 ## [GET]：
 @router.get("", response_model=List[R7Base], name="Get r7", description="Get r7", include_in_schema=True)

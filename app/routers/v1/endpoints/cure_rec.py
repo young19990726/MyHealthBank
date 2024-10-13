@@ -36,8 +36,8 @@ async def post_curerec(
     try:
         model = CureRecR1(
             hos=data.hos,
-            fk_hos_ordercode=data.fk_hos_ordercode,
-            accession_number=data.accession_number
+            accession_number=data.accession_number,
+            fk_hos_ordercode=data.fk_hos_ordercode
             )   
         db.add(model)  
         db.commit() 

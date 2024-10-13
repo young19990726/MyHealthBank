@@ -27,96 +27,55 @@ system_logger = logging.getLogger('custom.error')
 
 ##### 連接資料庫並處理請求 #####
 ## [POST] : 
-# @router.post("", response_model=R2Base, name="Post r2", description="Post r2", include_in_schema=True)
-# async def post_r2(
-#     db: Session = Depends(get_conn)  
-# ):
-#     try:
-#         dtlb_data = db.query(NHIDTLBR2).filter(NHIDTLBR2.is_analyzed == False).all()
-
-
-#         merged_data = []
-
-#         for dtlb in dtlb_data:
-
-#             hismedd_data = db.query(HISMEDDR2).filter(HISMEDDR2.medno == dtlb.fk_medno).all()
-
-#             cno = hismedd_data[0].cno if hismedd_data else None
-
-#             if cno:
-#                 # 查詢 NHIORDBR2
-#                 ordb_data = db.query(NHIORDBR2).filter(NHIORDBR2.accession_number == dtlb.accession_number).all()
-
-#                 for ordb in ordb_data:  # 使用 ordb_data 而不是 nhiordb_data
-#                     merged_record = {
-#                         "hos": dtlb.hos,
-#                         "cno": cno,
-#                         "fk_medno": dtlb.fk_medno,
-#                         "admission_date": dtlb.admission_date,
-#                         "discharge_date": dtlb.discharge_date,
-#                         "cm_code": dtlb.cm_code,
-#                         "pcs_code": dtlb.pcs_code,
-#                         "execution_date": ordb.execution_date,
-#                         "expiration_date": ordb.expiration_date,
-#                         "order_code": ordb.order_code,
-#                         "total_number": ordb.total_number
-#                     }
-                    
-
-#                     merged_data.append(merged_record)
-#         print(merged_data)
-
-#         # 提交資料變更
-#         # for dtlb in dtlb_data:
-#         #     dtlb.is_analyzed = True  # 標記為已分析
-#         if merged_data:
-#             db.add_all(merged_data)
-#             db.commit()
-
-#         return {"message": "Data merged successfully"}
-
-#     except Exception as e:
-#         system_logger.error(exception_message(e))
-#         # db.rollback()  # 確保在出錯時回滾
-#         raise HTTPException(status_code=500, detail="Error create BasicReport record")
 @router.post("", response_model=R2Base, name="Post r2", description="Post r2", include_in_schema=True)
 async def post_r2(
-    db: Session = Depends(get_conn)  
+    db: Session = Depends(get_conn)
 ):
     try:
         dtlb_data = db.query(NHIDTLBR2).filter(NHIDTLBR2.is_analyzed == False).all()
 
-        merged_data = []
+        if dtlb_data:
+            fk_mednos = [dtlb.fk_medno for dtlb in dtlb_data] 
+            hismedd_data = db.query(HISMEDDR2).filter(HISMEDDR2.medno.in_(fk_mednos)).all()
 
-        for dtlb in dtlb_data:
-            hismedd_data = db.query(HISMEDDR2).filter(HISMEDDR2.medno == dtlb.fk_medno).all()
-            cno = hismedd_data[0].cno if hismedd_data else None
+            if hismedd_data:
+                accession_numbers = [dtlb.accession_number for dtlb in dtlb_data]
+                ordb_data = db.query(NHIORDBR2).filter(NHIORDBR2.accession_number.in_(accession_numbers)).all()
 
-            if cno:
-                # 查詢 NHIORDBR2
-                ordb_data = db.query(NHIORDBR2).filter(NHIORDBR2.accession_number == dtlb.accession_number).all()
+                if ordb_data:
+                    # 建立索引，加速後續的查找
+                    hismedd_index = {h.medno: h for h in hismedd_data}
+                    ordb_index = {o.accession_number: [] for o in ordb_data}
+                    for o in ordb_data: 
+                        ordb_index[o.accession_number].append(o)
 
-                for ordb in ordb_data:
-                    # 創建 R2 類實例
-                    merged_record = R2(
-                        hos=dtlb.hos,
-                        cno=cno,
-                        fk_medno=dtlb.fk_medno,
-                        admission_date=dtlb.admission_date,
-                        discharge_date=dtlb.discharge_date,
-                        cm_code=dtlb.cm_code,
-                        pcs_code=dtlb.pcs_code,
-                        execution_date=ordb.execution_date,
-                        expiration_date=ordb.expiration_date,
-                        order_code=ordb.order_code,
-                        total_number=ordb.total_number,
-                        accession_number=ordb.accession_number
-                    )
-                    merged_data.append(merged_record)
+                    merged_data = []
 
-        # 提交資料變更
-        # for dtlb in dtlb_data:
-        #     dtlb.is_analyzed = True  # 標記為已分析
+                    for dtlb in dtlb_data:
+                        hismedd = hismedd_index.get(dtlb.fk_medno)
+                        if hismedd: 
+                            cno = hismedd.cno
+                            ordbs = ordb_index.get(dtlb.accession_number)
+                            if ordbs:
+                                for ordb in ordbs:
+                                    merged_record = R2(
+                                        hos=dtlb.hos,
+                                        cno=cno,
+                                        fk_medno=dtlb.fk_medno,
+                                        admission_date=dtlb.admission_date,
+                                        discharge_date=dtlb.discharge_date,
+                                        cm_code=dtlb.cm_code,
+                                        pcs_code=dtlb.pcs_code,
+                                        execution_date=ordb.execution_date,
+                                        expiration_date=ordb.expiration_date,
+                                        order_code=ordb.order_code,
+                                        total_number=ordb.total_number,
+                                        accession_number=ordb.accession_number
+                                    )
+                                    merged_data.append(merged_record)
+                                    ordb.is_analyzed = True
+
+                        dtlb.is_analyzed = True
 
         if merged_data:
             db.add_all(merged_data)
@@ -126,8 +85,9 @@ async def post_r2(
 
     except Exception as e:
         system_logger.error(exception_message(e))
-        db.rollback()  # 確保在出錯時回滾
+        db.rollback()
         raise HTTPException(status_code=500, detail="Error creating BasicReport record")
+
 
 ## [GET]：
 @router.get("", response_model=List[R2Base], name="Get r2", description="Get r2", include_in_schema=True)
