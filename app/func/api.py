@@ -1,9 +1,13 @@
 import json
 import logging
+import os
+import sys
 
 from collections import defaultdict
 from datetime import datetime
 from requests import get, patch, post, put, RequestException
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
 
 from middleware.exception import exception_message
 
@@ -312,6 +316,59 @@ class Hos801Data:
         
         except RequestException as e:
             system_logger.error(exception_message(e))
+
+    def get_lisdetail_data(self, report_date: str):
+
+        url = f"{self.base_url}/aiot_research"
+
+        try:
+            params = {"report_date": report_date}
+
+            response = get(url, params=params)
+
+            if response.status_code == 200:
+                print(json.dumps(response.json(), indent=4, ensure_ascii=False))
+                return response.json()
+
+            else:
+                print(f"Failed to retrieve LISDETAIL data: {response.text}")
+                system_logger.error(f"Failed to retrieve LISDETAIL data: {response.text}")
+                return None
+        
+        except RequestException as e:
+            system_logger.error(exception_message(e))
+            return None
+
+    def get_query_data_range(self, start_date: str, end_date: str, template_name: str, performed_item: str = None):
+
+        url = f"{self.base_url}/aiot_research/range"
+
+        try:
+            # 構建請求參數
+            params = {
+                "start_date": start_date,
+                "end_date": end_date,
+                "template_name": template_name
+            }
+
+            if performed_item:
+                params["performed_item"] = performed_item
+
+            # 發送 GET 請求
+            response = get(url, params=params)
+
+            # 檢查回應狀態
+            if response.status_code == 200:
+                print(json.dumps(response.json(), indent=4, ensure_ascii=True))
+                return response.json()
+            else:
+                print(f"Failed to retrieve AIOT research data: {response.text}")
+                system_logger.error(f"Failed to retrieve AIOT research data: {response.text}")
+                return None
+
+        except RequestException as e:
+            system_logger.error(f"Request exception: {e}")
+            return None
 
     def post_fxyreport_data(self, fxyreport_data):
 
@@ -822,49 +879,49 @@ if __name__ == "__main__":
     processor_all = HealthBankData()
     
     # DTLFA
-    dtlfa_data = pd.read_csv('./example/DTLFA.csv')
-    dtlfa_dict_list = dtlfa_data.to_dict(orient='records')
-    dtlfa_dict_list = processor.process_dtlfa_data(dtlfa_dict_list)
+    # dtlfa_data = pd.read_csv('./example/DTLFA.csv')
+    # dtlfa_dict_list = dtlfa_data.to_dict(orient='records')
+    # dtlfa_dict_list = processor.process_dtlfa_data(dtlfa_dict_list)
 
-    # ORDFA
-    ordfa_data = pd.read_csv('./example/ORDFA.csv')
-    ordfa_dict_list = ordfa_data.to_dict(orient='records')
-    ordfa_dict_list = processor.process_ordfa_data(ordfa_dict_list)
+    # # ORDFA
+    # ordfa_data = pd.read_csv('./example/ORDFA.csv')
+    # ordfa_dict_list = ordfa_data.to_dict(orient='records')
+    # ordfa_dict_list = processor.process_ordfa_data(ordfa_dict_list)
     
-    # ORDERCODEMASTER
-    ordercodemaster_data = pd.read_csv('./example/ORDERCODEMASTER.csv')
-    ordercodemaster_data_dict_list = ordercodemaster_data.to_dict(orient='records')
-    ordercodemaster_data_dict_list = processor.process_ordercodemaster_data(ordercodemaster_data_dict_list)
+    # # ORDERCODEMASTER
+    # ordercodemaster_data = pd.read_csv('./example/ORDERCODEMASTER.csv')
+    # ordercodemaster_data_dict_list = ordercodemaster_data.to_dict(orient='records')
+    # ordercodemaster_data_dict_list = processor.process_ordercodemaster_data(ordercodemaster_data_dict_list)
 
-    # CURE_REC
-    cure_rec_data = pd.read_csv('./example/CURE_REC.csv')
-    cure_rec_data_dict_list = cure_rec_data.to_dict(orient='records')
-    cure_rec_data_dict_list = processor.process_cure_rec_data(cure_rec_data_dict_list)
+    # # CURE_REC
+    # cure_rec_data = pd.read_csv('./example/CURE_REC.csv')
+    # cure_rec_data_dict_list = cure_rec_data.to_dict(orient='records')
+    # cure_rec_data_dict_list = processor.process_cure_rec_data(cure_rec_data_dict_list)
 
-    # HISMEDD
-    hismedd_data = pd.read_csv('./example/HISMEDD.csv')
-    hismedd_data_dict_list = hismedd_data.to_dict(orient='records')
-    hismedd_data_dict_list = processor.process_hismedd_data(hismedd_data_dict_list)
+    # # HISMEDD
+    # hismedd_data = pd.read_csv('./example/HISMEDD.csv')
+    # hismedd_data_dict_list = hismedd_data.to_dict(orient='records')
+    # hismedd_data_dict_list = processor.process_hismedd_data(hismedd_data_dict_list)
 
-    # NHIDTLB
-    nhidtlb_data = pd.read_csv('./example/NHIDTLB.csv')
-    nhidtlb_data_dict_list = nhidtlb_data.to_dict(orient='records')
-    nhidtlb_data_dict_list = processor.process_nhidtlb_data(nhidtlb_data_dict_list)
+    # # NHIDTLB
+    # nhidtlb_data = pd.read_csv('./example/NHIDTLB.csv')
+    # nhidtlb_data_dict_list = nhidtlb_data.to_dict(orient='records')
+    # nhidtlb_data_dict_list = processor.process_nhidtlb_data(nhidtlb_data_dict_list)
     
-    # NHIORDB
-    nhiordb_data = pd.read_csv('./example/NHIORDB.csv')
-    nhiordb_data_dict_list = nhiordb_data.to_dict(orient='records')
-    nhiordb_data_dict_list = processor.process_nhiordb_data(nhiordb_data_dict_list)
+    # # NHIORDB
+    # nhiordb_data = pd.read_csv('./example/NHIORDB.csv')
+    # nhiordb_data_dict_list = nhiordb_data.to_dict(orient='records')
+    # nhiordb_data_dict_list = processor.process_nhiordb_data(nhiordb_data_dict_list)
     
-    # FEXREPORT
-    fexreport_data = pd.read_csv('./example/FEXREPORT.csv')
-    fexreport_data_dict_list = fexreport_data.to_dict(orient='records')
-    fexreport_data_dict_list = processor.process_fexreport_data(fexreport_data_dict_list)
+    # # FEXREPORT
+    # fexreport_data = pd.read_csv('./example/FEXREPORT.csv')
+    # fexreport_data_dict_list = fexreport_data.to_dict(orient='records')
+    # fexreport_data_dict_list = processor.process_fexreport_data(fexreport_data_dict_list)
 
-    # FXYREPORT
-    fxyreport_data = pd.read_csv('./example/FXYREPORT.csv')
-    fxyreport_data_dict_list = fxyreport_data.to_dict(orient='records')
-    fxyreport_data_dict_list = processor.process_fxyreport_data(fxyreport_data_dict_list)
+    # # FXYREPORT
+    # fxyreport_data = pd.read_csv('./example/FXYREPORT.csv')
+    # fxyreport_data_dict_list = fxyreport_data.to_dict(orient='records')
+    # fxyreport_data_dict_list = processor.process_fxyreport_data(fxyreport_data_dict_list)
 
     # processor_api.post_ordercodemaster_data(ordercodemaster_data_dict_list)
     # processor_api.get_ordercodemaster_data()
@@ -889,6 +946,9 @@ if __name__ == "__main__":
 
     # processor_api.post_fexreport_data(fexreport_data_dict_list)
     # processor_api.get_fexreport_data()
+    # processor_api.get_lisdetail_data(report_date='20240910')
+
+    # processor_api.get_query_data_range('20230101', '20230102', '超音波檢查報告', 'Echo')
 
     # processor_api.post_fxyreport_data(fxyreport_data_dict_list)
     # processor_api.get_fxyreport_data()
@@ -900,7 +960,7 @@ if __name__ == "__main__":
     # processor_all.get_r2_data_by_cno('3363739')
 
     # processor_all.post_r7_data()
-    # processor_all.get_r7_data_by_cno('3363739')
+    processor_all.get_r7_data_by_cno('3363739')
 
     # processor_all.post_r8_data()
     # processor_all.get_r8_data_by_cno('3363739')

@@ -10,6 +10,7 @@ from app.routers.v1.endpoints import (
     nhidtlb,
     nhiordb,
     r2,
+    aiot_research,
     fexreport,
     r7,
     fxyreport,
@@ -32,6 +33,7 @@ router_v1.include_router(cure_rec.router, prefix="/cure_rec", tags=["CURE REC"])
 router_v1.include_router(hismedd.router, prefix="/hismedd", tags=["HISMEDD"])
 router_v1.include_router(nhidtlb.router, prefix="/nhidtlb", tags=["NHIDTLB"])
 router_v1.include_router(nhiordb.router, prefix="/nhiordb", tags=["NHIORDB"])
+router_v1.include_router(aiot_research.router, prefix="/aiot_research", tags=["AIOT RESEARCH"])
 router_v1.include_router(fexreport.router, prefix="/fexreport", tags=["FEXREPORT"])
 router_v1.include_router(fxyreport.router, prefix="/fxyreport", tags=["FXYREPORT"])
 
